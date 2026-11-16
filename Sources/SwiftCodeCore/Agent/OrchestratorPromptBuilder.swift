@@ -17,4 +17,11 @@ enum OrchestratorPromptBuilder {
             rules.isEmpty ? nil : rules,
         ].compactMap { $0 }.joined(separator: "\n\n")
     }
+
+    static func buildToolCalls(order: [String], map: [String: (name: String, args: String)]) -> [ToolCall] {
+        order.compactMap { id -> ToolCall? in
+            guard let pair = map[id] else { return nil }
+            return ToolCall(id: id, name: pair.name, argumentsJSON: pair.args.isEmpty ? "{}" : pair.args)
+        }
+    }
 }
