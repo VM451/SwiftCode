@@ -38,12 +38,12 @@ public struct TokenUsage: Codable, Sendable, Equatable {
         cachedTokens: Int
     ) -> Double {
         let lower = model.lowercased()
-        let (inRate, outRate): (Double, Double) = if lower.contains("opus") {
+        let (inRate, outRate): (Double, Double) = if lower.contains("apple") || lower.contains("mlx") || lower.contains("ollama") || lower.contains("local") {
+            (0.0, 0.0)
+        } else if lower.contains("opus") {
             (15.0, 75.0)
         } else if lower.contains("haiku") || lower.contains("mini") || lower.contains("flash") {
             (0.25, 1.25)
-        } else if lower.contains("mlx") || lower.contains("ollama") || lower.contains("local") {
-            (0.0, 0.0)
         } else {
             (3.0, 15.0)
         }
