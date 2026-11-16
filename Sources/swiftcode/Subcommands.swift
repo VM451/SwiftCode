@@ -67,12 +67,56 @@ struct DoctorCommand: AsyncParsableCommand {
         let store = SecretStoreFactory.makeDefault()
         let keys = (try? await store.listKeys()) ?? []
         let vm = await MicroVMRunner().checkReadiness()
+        let inspector = LiveAppleFoundationModelInspector()
+        let local = inspector.localAvailability()
+        let pcc = await inspector.pccQuotaState()
+        let cfg = ConfigurationStore().load()
+
         print("SwiftCode Doctor:")
+        print("  Default Apple Model: \(cfg.defaultAppleModel.displayName) (\(cfg.defaultAppleModel.shortLabel))")
+        print("  Apple Foundation (Local): available=\(local.available) context=\(local.contextSize) tok\(local.reason.map { " (\($0))" } ?? "")")
+        print("  Apple Private Cloud Compute: available=\(pcc.isAvailable) limitReached=\(pcc.isLimitReached) approaching=\(pcc.isApproachingLimit)")
+        if pcc.isLimitReached || !pcc.isAvailable {
+            print("    PCC Note: \(pcc.formattedGuidance())")
+        }
         print("  SecretStore keys configured: \(keys.isEmpty ? "none" : keys.joined(separator: ", "))")
         print("  macOS Seatbelt sandbox-exec: \(FileManager.default.isExecutableFile(atPath: "/usr/bin/sandbox-exec"))")
         print("  Virtualization.framework: \(vm.virtualizationSupported)")
         print("  Apple Silicon MLX ready: \(MLXLocalProvider.isAppleSiliconSupported)")
         print("  Current RSS memory: \(String(format: "%.2f", ProcessMemoryReporter.currentRSSMegabytes())) MB")
+    }
+}
+
+struct ModelCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "model", abstract: "View or switch default Apple Foundation Model (local or pcc)")
+
+    @Argument(help: "Optional variant to set as default: local or pcc.")
+    var variant: String?
+
+    @Flag(name: .long, help: "Open Apple iCloud+ / quota options in System Settings when Private Cloud Compute is limited.")
+    var icloud = false
+
+    func run() async throws {
+        let store = ConfigurationStore()
+        var cfg = store.load()
+        if let variant {
+            guard let parsed = AppleFoundationModelVariant.parseUserSelection(variant) else {
+                throw ValidationError("Specify 'local' or 'pcc'.")
+            }
+            cfg.applyDefaultAppleModel(parsed)
+            try store.save(cfg)
+            print("Default Apple Foundation Model set to \(cfg.defaultAppleModel.displayName) (\(cfg.defaultAppleModel.shortLabel)).")
+        } else {
+            print("Default Apple Foundation Model: \(cfg.defaultAppleModel.displayName) (\(cfg.defaultAppleModel.shortLabel))")
+        }
+        let pcc = await LiveAppleFoundationModelInspector().pccQuotaState()
+        print("PCC Status: \(pcc.formattedGuidance())")
+        if pcc.isLimitReached || pcc.isApproachingLimit {
+            PCCDesktopNotifier.notifyIfNeeded(PCCQuotaNotice(state: pcc))
+        }
+        if icloud {
+            await PCCDesktopNotifier.openICloudQuotaOptions()
+        }
     }
 }
 
