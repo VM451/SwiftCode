@@ -1,6 +1,8 @@
-# UI Token
+# UI Token (ANSI Terminal Escape Palette)
 
-- Colors: Dynamic system backgrounds/surfaces + `AccentColor` (Steel Copper/Teal identity with Light & Dark variants in `Assets.xcassets`).
-- Spacing (`AppSpacing` 8pt grid): `xxSmall 4`, `small 8`, `medium 12`, `large 16`, `xLarge 20`, `xxLarge 24`, `hero 32`; semantic `screenHorizontal 16`, `screenVertical 16`, `section 24`, `card 16`, `rowVertical 12`, `stackSmall 8`, `stackMedium 12`.
-- Sizes (`AppSizes`): Heights `heightCompact 32`, `heightStandard 44`, `heightLarge 56`; Icons `iconSmall 16`, `iconMedium 20`, `iconLarge 28`; Images `imageSmall 40`, `imageMedium 64`, `imageLarge 96`; Fixed widths `widthCompact 120`, `widthStandard 200`, `widthLarge 320`; Radii `radiusSmall 8`, `radiusMedium 12`, `radiusLarge 16`.
-- Type: System SF Pro for UI chrome, SF Mono for code, diffs, and token telemetry.
+- Reset & style: Reset `\u{001B}[0m`, Bold `\u{001B}[1m`, Dim `\u{001B}[2m`.
+- Semantic colors:
+  - Plan badge / info: Cyan `\u{001B}[36m` / `\u{001B}[1;46;30m`
+  - Build badge / quota warning / model highlight: Amber `\u{001B}[33m` / `\u{001B}[1;43;30m`
+  - Success / pass / additions: Green `\u{001B}[32m`
+  - Quota limit reached / error / deletions: Red `\u{001B}[31m`
