@@ -66,10 +66,16 @@ public struct FallbackLLMProvider: LLMProvider, Sendable {
 public struct ProviderRegistry: Sendable {
     private let secretStore: any SecretStore
     private let transport: HTTPTransport
+    private let appleInspector: any AppleFoundationModelInspector
 
-    public init(secretStore: any SecretStore = SecretStoreFactory.makeDefault(), transport: HTTPTransport = .shared) {
+    public init(
+        secretStore: any SecretStore = SecretStoreFactory.makeDefault(),
+        transport: HTTPTransport = .shared,
+        appleInspector: any AppleFoundationModelInspector = LiveAppleFoundationModelInspector()
+    ) {
         self.secretStore = secretStore
         self.transport = transport
+        self.appleInspector = appleInspector
     }
 
     public func assignment(for role: ModelRole, config: SwiftCodeConfiguration) -> ModelRoleAssignment {
@@ -89,6 +95,10 @@ public struct ProviderRegistry: Sendable {
 
     public func makeProvider(id: String, baseURL: String? = nil) -> any LLMProvider {
         switch id.lowercased() {
+        case "apple-local":
+            return AppleFoundationModelProvider(variant: .local, inspector: appleInspector)
+        case "apple-pcc":
+            return AppleFoundationModelProvider(variant: .privateCloudCompute, inspector: appleInspector)
         case "anthropic":
             return AnthropicProvider(secretStore: secretStore, baseURL: baseURL ?? "https://api.anthropic.com", transport: transport)
         case "openai":
