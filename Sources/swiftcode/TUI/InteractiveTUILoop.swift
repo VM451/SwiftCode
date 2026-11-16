@@ -12,7 +12,7 @@ public struct InteractiveTUILoop: Sendable {
     }
 
     public func run() async throws {
-        let renderer = TerminalRenderer()
+        let renderer = TerminalRenderer(contextLimit: configuration.effectiveContextWindowLimit(for: configuration.defaultMode == .plan ? .architect : .coder))
         let shadowGit = ShadowGitManager(workspaceRoot: workspaceRoot)
         let orchestrator = OrchestratorActor(
             workspaceRoot: workspaceRoot,
@@ -48,7 +48,7 @@ public struct InteractiveTUILoop: Sendable {
             if input.isEmpty { continue }
 
             if input.hasPrefix("/") {
-                let shouldExit = await handleSlashCommand(input, orchestrator: orchestrator, shadowGit: shadowGit)
+                let shouldExit = await handleSlashCommand(input, orchestrator: orchestrator, shadowGit: shadowGit, renderer: renderer)
                 if shouldExit { break }
                 continue
             }
@@ -64,7 +64,8 @@ public struct InteractiveTUILoop: Sendable {
     private func handleSlashCommand(
         _ command: String,
         orchestrator: OrchestratorActor,
-        shadowGit: ShadowGitManager
+        shadowGit: ShadowGitManager,
+        renderer: TerminalRenderer
     ) async -> Bool {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         switch parts[0].lowercased() {
@@ -74,6 +75,26 @@ public struct InteractiveTUILoop: Sendable {
             await orchestrator.setMode(.plan)
         case "/build":
             await orchestrator.setMode(.build)
+        case "/model":
+            if parts.count > 1, parts[1].lowercased().contains("icloud") {
+                await PCCDesktopNotifier.openICloudQuotaOptions()
+                print("Opened Apple iCloud+ / quota options.")
+            } else if parts.count > 1, let parsed = AppleFoundationModelVariant.parseUserSelection(parts[1]) {
+                await orchestrator.switchAppleVariant(parsed)
+                await renderer.setContextLimit(parsed.defaultContextWindowTokens)
+                print("Switched to \(parsed.displayName) (\(parsed.shortLabel)).")
+                if parsed == .privateCloudCompute {
+                    let state = await LiveAppleFoundationModelInspector().pccQuotaState()
+                    print("PCC Status: \(state.formattedGuidance())")
+                    if state.isLimitReached || state.isApproachingLimit {
+                        PCCDesktopNotifier.notifyIfNeeded(PCCQuotaNotice(state: state))
+                    }
+                }
+            } else {
+                await orchestrator.switchAppleVariant(.local)
+                await renderer.setContextLimit(AppleFoundationModelVariant.local.defaultContextWindowTokens)
+                print("Switched to \(AppleFoundationModelVariant.local.displayName) (\(AppleFoundationModelVariant.local.shortLabel), unlimited). Use `/model pcc` or `/model icloud`.")
+            }
         case "/checkpoints":
             let list = (try? await shadowGit.listCheckpoints(limit: 15)) ?? []
             if list.isEmpty {
@@ -104,7 +125,7 @@ public struct InteractiveTUILoop: Sendable {
             let usage = await orchestrator.currentUsage()
             print("Session: \(orchestrator.sessionID.uuidString) | Mode: \(mode.rawValue) | Tokens: \(usage.totalTokens)")
         case "/help":
-            print("Commands: /plan, /build, /checkpoints, /undo [n], /diff [hash], /export, /status, /quit")
+            print("Commands: /plan, /build, /model [local|pcc|icloud], /checkpoints, /undo [n], /diff [hash], /export, /status, /quit")
         default:
             print("Unknown command: \(parts[0]). Type /help.")
         }
