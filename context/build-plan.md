@@ -1,0 +1,6 @@
+# Build Plan
+
+- [x] Phase 1 — Core CLI, Streaming Loop & Modal Engine: `Package.swift`, models, config, security/Keychain, `LLMProvider` SSE streaming (`Anthropic`, `OpenAI`, `Gemini`, `Ollama`, `MLX`), `OrchestratorActor`, Plan/Build modes, self-healing loop, core file/shell tools, raw `termios` ANSI TUI.
+- [x] Phase 2 — Safety, Checkpoints, AST & MCP: `ApprovalGate`, `ShadowGitManager`, `UnifiedDiffEngine`, `SecretRedactor`, `SeatbeltSandbox` (`sandbox-exec`/`unshare`), `SwiftASTInspector` (`SwiftSyntax`), `LSPClient` (`SourceKit-LSP`), `MCPStdioClient` & `MCPStdioServer` (`--mcp-server` / HTTP).
+- [x] Phase 3 — Always-On Daemon, Memory & Chat Bridges: `MemoryStore` (SQLite + FTS5 + Markdown), `ProjectRulesLoader`, `ContextCompactor`, `DaemonServer` (`SwiftNIO` Unix socket + HMAC webhook), `CronScheduler`, `TelegramBridge`, `DiscordBridge`, `SlackBridge`, `AppleShortcutsBridge`, `launchd`/`systemd` installers.
+- [x] Phase 4 — Virtualization, Swarm, SkillKit & SwiftUI Companion App: `MicroVMRunner` (`Virtualization.framework`), `SwarmCoordinator` + `SubAgentActor` + git worktrees, `SkillRegistry` (`SwiftCodeSkill` + `.dylib`/`.so` `dlopen`), `SwiftCodeApp` macOS 27.0+ Liquid Glass SwiftUI/AppKit companion app, full Swift Testing verification.
