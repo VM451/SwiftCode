@@ -31,9 +31,9 @@ public struct ModelRoutingConfig: Codable, Sendable, Equatable {
     public var fallback: ModelRoleAssignment?
 
     public init(
-        architect: ModelRoleAssignment = .init(provider: "anthropic", model: "claude-sonnet-4-5"),
-        coder: ModelRoleAssignment = .init(provider: "anthropic", model: "claude-sonnet-4-5"),
-        utility: ModelRoleAssignment = .init(provider: "ollama", model: "qwen2.5-coder:7b"),
+        architect: ModelRoleAssignment = .init(provider: "apple-local", model: AppleFoundationModelVariant.local.rawValue, maxTokens: 1024),
+        coder: ModelRoleAssignment = .init(provider: "apple-local", model: AppleFoundationModelVariant.local.rawValue, maxTokens: 1024),
+        utility: ModelRoleAssignment = .init(provider: "apple-local", model: AppleFoundationModelVariant.local.rawValue, maxTokens: 512),
         fallback: ModelRoleAssignment? = nil
     ) {
         self.architect = architect
@@ -130,6 +130,7 @@ public struct DaemonConfig: Codable, Sendable, Equatable {
 /// Top-level declarative SwiftCode configuration (`~/.swiftcode/config.json`).
 public struct SwiftCodeConfiguration: Codable, Sendable, Equatable {
     public var defaultMode: AgentMode
+    public var defaultAppleModel: AppleFoundationModelVariant
     public var contextWindowLimit: Int
     public var compactionThresholdRatio: Double
     public var maxAutoFixRetries: Int
@@ -143,7 +144,8 @@ public struct SwiftCodeConfiguration: Codable, Sendable, Equatable {
 
     public init(
         defaultMode: AgentMode = .plan,
-        contextWindowLimit: Int = 200_000,
+        defaultAppleModel: AppleFoundationModelVariant = .local,
+        contextWindowLimit: Int = 4_096,
         compactionThresholdRatio: Double = 0.80,
         maxAutoFixRetries: Int = 3,
         models: ModelRoutingConfig = .init(),
@@ -155,6 +157,7 @@ public struct SwiftCodeConfiguration: Codable, Sendable, Equatable {
         verificationCommands: [String] = ["swift test"]
     ) {
         self.defaultMode = defaultMode
+        self.defaultAppleModel = defaultAppleModel
         self.contextWindowLimit = contextWindowLimit
         self.compactionThresholdRatio = compactionThresholdRatio
         self.maxAutoFixRetries = maxAutoFixRetries
@@ -165,5 +168,32 @@ public struct SwiftCodeConfiguration: Codable, Sendable, Equatable {
         self.daemon = daemon
         self.mcpServers = mcpServers
         self.verificationCommands = verificationCommands
+    }
+
+    /// Resolves effective context window limit for the active role's model (`4K` local vs `32K` PCC vs external).
+    public func effectiveContextWindowLimit(for role: ModelRole) -> Int {
+        let assignment = switch role {
+        case .architect: models.architect
+        case .coder: models.coder
+        case .utility: models.utility
+        }
+        if let variant = AppleFoundationModelVariant.from(providerID: assignment.provider, model: assignment.model) {
+            return variant.defaultContextWindowTokens
+        }
+        return contextWindowLimit
+    }
+
+    /// Switches default Apple Foundation Model between Local (~4K) and Private Cloud Compute (~32K).
+    public mutating func applyDefaultAppleModel(_ variant: AppleFoundationModelVariant) {
+        defaultAppleModel = variant
+        contextWindowLimit = variant.defaultContextWindowTokens
+        let maxOut = variant == .local ? 1024 : 4096
+        models.architect = ModelRoleAssignment(provider: variant.providerID, model: variant.rawValue, maxTokens: maxOut)
+        models.coder = ModelRoleAssignment(provider: variant.providerID, model: variant.rawValue, maxTokens: maxOut)
+        models.utility = ModelRoleAssignment(
+            provider: AppleFoundationModelVariant.local.providerID,
+            model: AppleFoundationModelVariant.local.rawValue,
+            maxTokens: 512
+        )
     }
 }
