@@ -5,8 +5,8 @@ Agent entry point for **SwiftCode**. Durable context lives in `context/` — rea
 ## Session protocol
 
 1. Read `context/project-overview.md` and `context/progress-trackers.md` first.
-2. Read `context/architecture.md` + `context/code-standard.md` before touching code; add `context/library-docs.md` for dependencies and `context/ui-*.md` for `SwiftCodeApp` UI work.
-3. Build and run Swift Testing suite (`swift test`). For `SwiftCodeApp`, build and verify with `ess-xcode-run`.
+2. Read `context/architecture.md` + `context/code-standard.md` before touching code; add `context/library-docs.md` for dependencies and `context/ui-*.md` for ANSI TUI conventions.
+3. Build and run Swift Testing suite (`swift test`) and verify the `swiftcode` CLI binary.
 4. Update affected `context/` files before finishing.
 
 ## Context map
@@ -26,8 +26,7 @@ Agent entry point for **SwiftCode**. Durable context lives in `context/` — rea
 
 - Resolve SPM deps: `swift package resolve`
 - Build CLI & core: `swift build`
-- Release CLI build: `swift build -c release`
-- Build macOS app: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer asc xcode build --project SwiftCodeApp/SwiftCodeApp.xcodeproj --scheme SwiftCodeApp --destination "platform=macOS" --configuration Debug`
+- Release CLI build: `swift build -c release --product swiftcode`
 
 ## Testing
 
@@ -36,18 +35,16 @@ Agent entry point for **SwiftCode**. Durable context lives in `context/` — rea
 
 ## Code style
 
-- Stack: Pure Swift 6.2+ (`-strict-concurrency=complete`), SPM, SwiftUI + AppKit (`macOS 27.0` companion app).
+- Stack: Pure Swift 6.2+ (`-strict-concurrency=complete`), SPM, CLI-only distribution (zero GUI app target).
 - Zero web tech (no HTML, CSS, JS, TS, Electron, WebViews, Node.js, Python, or Rust).
-- File guardrail: `<= 300` lines (`wc -l`), healthy `<= 200`, Views `<= 150`, one primary type per file (`Filename.swift`).
-- macOS Companion App uses strict MVVM folder-by-feature (`Features/<Feature>/{Views,ViewModels,Models,Tests}`).
+- File guardrail: `<= 300` lines (`wc -l`), healthy `<= 200`, one primary type per file (`Filename.swift`).
 
 ## Project structure
 
 - `Sources/SwiftCodeCore/`: Platform-agnostic Swift 6 agent engine, LLM providers, tools, ShadowGit, Sandbox, AST/LSP, MCP, SkillKit.
 - `Sources/SwiftCodeDaemon/`: SwiftNIO Unix socket / webhook server, CronScheduler, Telegram/Discord/Slack/Shortcuts bridges.
-- `Sources/swiftcode/`: Pure Swift CLI (`swift-argument-parser`) & raw `termios` ANSI TUI.
+- `Sources/swiftcode/`: Pure Swift CLI (`swift-argument-parser`), desktop PCC quota notifier, & raw `termios` ANSI TUI.
 - `Tests/SwiftCodeCoreTests/`: Swift Testing (`@Test`, `#expect`, `#require`) suite.
-- `SwiftCodeApp/`: Native macOS 27.0+ SwiftUI + AppKit companion app (`SwiftCodeApp.xcodeproj`).
 
 ## Boundaries
 
