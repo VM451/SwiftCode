@@ -16,6 +16,7 @@ public actor OrchestratorActor {
 
     private let providerRegistry: ProviderRegistry
     private let overrideProvider: (any LLMProvider)?
+    private let appleInspector: any AppleFoundationModelInspector
     private let toolRegistry: ToolRegistry
     private let approvalGate: ApprovalGate
     private let shadowGit: ShadowGitManager
@@ -31,8 +32,9 @@ public actor OrchestratorActor {
         sessionID: UUID = UUID(),
         workspaceRoot: URL,
         configuration: SwiftCodeConfiguration = ConfigurationStore().load(),
-        providerRegistry: ProviderRegistry = ProviderRegistry(),
+        providerRegistry: ProviderRegistry? = nil,
         overrideProvider: (any LLMProvider)? = nil,
+        appleInspector: any AppleFoundationModelInspector = LiveAppleFoundationModelInspector(),
         toolRegistry: ToolRegistry = .makeDefault(),
         approvalGate: ApprovalGate? = nil,
         memoryStore: MemoryStore? = try? MemoryStore()
@@ -40,8 +42,9 @@ public actor OrchestratorActor {
         self.sessionID = sessionID
         self.workspaceRoot = workspaceRoot.standardizedFileURL
         self.configuration = configuration
+        self.appleInspector = appleInspector
+        self.providerRegistry = providerRegistry ?? ProviderRegistry(appleInspector: appleInspector)
         self.mode = configuration.defaultMode
-        self.providerRegistry = providerRegistry
         self.overrideProvider = overrideProvider
         self.toolRegistry = toolRegistry
         self.approvalGate = approvalGate ?? ApprovalGate(policy: configuration.permissions)
@@ -62,7 +65,7 @@ public actor OrchestratorActor {
     public func eventHistory() -> [AgentEvent] { events }
     public func messageHistory() -> [ConversationMessage] { messages }
 
-    /// Subscribes to live `AgentEvent` updates across CLI TUI, SwiftUI, and chat bridges.
+    /// Subscribes to live `AgentEvent` updates across CLI TUI, daemon streams, and chat bridges.
     public func subscribe() -> AsyncStream<AgentEvent> {
         let token = UUID()
         let (stream, continuation) = AsyncStream.makeStream(of: AgentEvent.self)
@@ -78,6 +81,10 @@ public actor OrchestratorActor {
         let old = mode
         mode = newMode
         emit(.modeChanged(from: old, to: newMode))
+    }
+
+    public func switchAppleVariant(_ variant: AppleFoundationModelVariant) {
+        configuration.applyDefaultAppleModel(variant)
     }
 
     /// Executes a user prompt through the Plan or Build loop and returns the final assistant text.
@@ -98,8 +105,15 @@ public actor OrchestratorActor {
 
         let role: ModelRole = mode == .plan ? .architect : .coder
         let assignment = providerRegistry.assignment(for: role, config: configuration)
+        if assignment.provider == "apple-pcc" {
+            let pccState = await appleInspector.pccQuotaState()
+            if pccState.isLimitReached || pccState.isApproachingLimit {
+                emit(.pccQuotaNotice(PCCQuotaNotice(state: pccState)))
+            }
+        }
         let provider = overrideProvider ?? providerRegistry.provider(for: assignment, fallback: configuration.models.fallback)
         let systemPrompt = OrchestratorPromptBuilder.systemPrompt(mode: mode, workspaceRoot: workspaceRoot, rulesLoader: rulesLoader)
+        let activeContextLimit = configuration.effectiveContextWindowLimit(for: role)
 
         var finalAssistantText = ""
         for _ in 0..<maxIterations {
@@ -108,6 +122,7 @@ public actor OrchestratorActor {
             let compactResult = await compactor.compactIfNeeded(
                 systemPrompt: systemPrompt,
                 messages: messages,
+                maxTokensOverride: activeContextLimit,
                 utilityProvider: utilityProvider,
                 utilityModel: utilityAssignment.model
             )
@@ -170,7 +185,6 @@ public actor OrchestratorActor {
         var reasoning = ""
         var calls: [String: (name: String, args: String)] = [:]
         var callOrder: [String] = []
-
         do {
             for try await chunk in provider.streamCompletion(request: request) {
                 switch chunk {
@@ -192,6 +206,12 @@ public actor OrchestratorActor {
                     break
                 }
             }
+        } catch let appleError as AppleFoundationModelError {
+            if case .pccQuotaLimitReached(let quotaState) = appleError {
+                emit(.pccQuotaNotice(PCCQuotaNotice(state: quotaState)))
+            }
+            emit(.errorEncountered(message: appleError.localizedDescription))
+            throw appleError
         } catch {
             if !text.isEmpty || !reasoning.isEmpty {
                 messages.append(ConversationMessage(role: .assistant, content: text + "\n[Partial response preserved after stream interruption]"))
@@ -199,12 +219,7 @@ public actor OrchestratorActor {
             emit(.errorEncountered(message: error.localizedDescription))
             throw error
         }
-
-        let builtCalls = callOrder.compactMap { id -> ToolCall? in
-            guard let pair = calls[id] else { return nil }
-            return ToolCall(id: id, name: pair.name, argumentsJSON: pair.args.isEmpty ? "{}" : pair.args)
-        }
-        return (text, reasoning, builtCalls)
+        return (text, reasoning, OrchestratorPromptBuilder.buildToolCalls(order: callOrder, map: calls))
     }
 
     private func executeToolCall(_ rawCall: ToolCall) async {
