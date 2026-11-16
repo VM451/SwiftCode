@@ -11,8 +11,15 @@ public actor TerminalRenderer {
     private let green = "\u{001B}[32m"
     private let red = "\u{001B}[31m"
     private var insideCodeBlock = false
+    private var contextLimit: Int
 
-    public init() {}
+    public init(contextLimit: Int = AppleFoundationModelVariant.local.defaultContextWindowTokens) {
+        self.contextLimit = max(1, contextLimit)
+    }
+
+    public func setContextLimit(_ limit: Int) {
+        self.contextLimit = max(1, limit)
+    }
 
     public func renderHeader(workspace: URL, branch: String, mode: AgentMode, model: String) {
         let width = max(60, min(120, TerminalRawMode.terminalWidth()))
@@ -20,7 +27,7 @@ public actor TerminalRenderer {
         let rule = String(repeating: "─", count: width)
         print("\(dim)\(rule)\(reset)")
         print("\(badge) \(bold)SwiftCode\(reset)  \(cyan)\(workspace.lastPathComponent)\(reset) (\(branch))  •  model: \(amber)\(model)\(reset)")
-        print("\(dim)Slash: /plan  /build  /undo  /checkpoints  /diff  /export  /status  /help  /quit   |   Mentions: @file: @symbol: @git:diff\(reset)")
+        print("\(dim)Slash: /plan  /build  /model  /undo  /checkpoints  /diff  /export  /status  /help  /quit   |   Mentions: @file: @symbol: @git:diff\(reset)")
         print("\(dim)\(rule)\(reset)")
     }
 
@@ -63,11 +70,18 @@ public actor TerminalRenderer {
         case .verificationCompleted(let passed, let summary):
             let tag = passed ? "\(green)PASS\(reset)" : "\(red)FAIL\(reset)"
             print("\(tag) \(summary.prefix(300))")
+        case .pccQuotaNotice(let notice):
+            let color = notice.state.isLimitReached ? red : amber
+            print("\n\(color)⚠ Private Cloud Compute Notice:\(reset) \(notice.message)")
+            if notice.state.isLimitReached {
+                print("\(cyan)Tip: Switch immediately with `/model local` (unlimited) or run `/model icloud` to inspect your iCloud+ plan.\(reset)")
+            }
+            PCCDesktopNotifier.notifyIfNeeded(notice)
         case .errorEncountered(let message):
             print("\n\(red)Error: \(message)\(reset)")
         case .turnCompleted(let usage):
             print("")
-            renderFooter(usage: usage)
+            renderFooter(usage: usage, contextLimit: contextLimit)
         default:
             break
         }
