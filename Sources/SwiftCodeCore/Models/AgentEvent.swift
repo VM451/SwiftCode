@@ -1,6 +1,6 @@
 import Foundation
 
-/// Immutable event emitted by `OrchestratorActor` for replay, TUI, and SwiftUI observation.
+/// Immutable event emitted by `OrchestratorActor` for replay, CLI TUI, and daemon observation.
 public struct AgentEvent: Codable, Sendable, Equatable, Identifiable {
     public let id: UUID
     public let sessionID: UUID
@@ -37,6 +37,7 @@ public enum AgentEventKind: Codable, Sendable, Equatable {
     case modeChanged(from: AgentMode, to: AgentMode)
     case verificationStarted(command: String)
     case verificationCompleted(passed: Bool, summary: String)
+    case pccQuotaNotice(PCCQuotaNotice)
     case errorEncountered(message: String)
     case turnCompleted(usage: TokenUsage)
 }
