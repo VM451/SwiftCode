@@ -11,6 +11,7 @@ struct SwiftCodeCLI: AsyncParsableCommand {
         version: "2.0.0",
         subcommands: [
             RunCommand.self,
+            ModelCommand.self,
             ResumeCommand.self,
             UndoCommand.self,
             CheckpointCommand.self,
@@ -70,13 +71,26 @@ struct RunCommand: AsyncParsableCommand {
             config.sandbox.defaultTier = tier
         }
         if let model {
-            config.models.architect.model = model
-            config.models.coder.model = model
+            if let appleVariant = AppleFoundationModelVariant.parseUserSelection(model) {
+                config.applyDefaultAppleModel(appleVariant)
+            } else {
+                config.models.architect.model = model
+                config.models.coder.model = model
+            }
         }
         let gate = ApprovalGate(policy: config.permissions) { _ in
             yes ? .allowOnce : .deny("Non-interactive run requires --yes to approve mutating tools.")
         }
         let orchestrator = OrchestratorActor(workspaceRoot: workspace, configuration: config, approvalGate: gate)
+        let noticeTask = Task {
+            for await event in await orchestrator.subscribe() {
+                if case .pccQuotaNotice(let notice) = event.kind {
+                    FileHandle.standardError.write(Data("[SwiftCode PCC Notice] \(notice.message)\n".utf8))
+                    PCCDesktopNotifier.notifyIfNeeded(notice)
+                }
+            }
+        }
+        defer { noticeTask.cancel() }
         let reply = try await orchestrator.runTurn(userPrompt: prompt)
         if json {
             let usage = await orchestrator.currentUsage()
