@@ -1,6 +1,6 @@
 import Foundation
 
-/// Human-in-the-loop approval prompt context sent to CLI TUI, SwiftUI, or chat bridges.
+/// Human-in-the-loop approval prompt context sent to CLI TUI, daemon, or chat bridges.
 public struct ApprovalRequest: Sendable, Equatable {
     public let call: ToolCall
     public let riskLevel: ToolRiskLevel
@@ -15,7 +15,7 @@ public struct ApprovalRequest: Sendable, Equatable {
     }
 }
 
-/// Async prompt callback provided by the presentation layer (`TUI`, `SwiftUI`, `TelegramBridge`, or `--yes`).
+/// Async prompt callback provided by the presentation layer (`TUI`, `TelegramBridge`, or `--yes`).
 public typealias ApprovalHandler = @Sendable (ApprovalRequest) async -> ApprovalResolution
 
 /// Evaluates permission policies, session approvals, glob auto-allow commands, and deny rules (FR-5.1).

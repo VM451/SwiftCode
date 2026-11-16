@@ -39,7 +39,7 @@ public struct DiffHunk: Codable, Sendable, Equatable {
     }
 }
 
-/// Pure-Swift structured diff representation for terminal ANSI and SwiftUI `NSTextView` rendering.
+/// Pure-Swift structured diff representation for terminal ANSI rendering.
 public struct FileDiff: Codable, Sendable, Equatable {
     public let path: String
     public let hunks: [DiffHunk]
