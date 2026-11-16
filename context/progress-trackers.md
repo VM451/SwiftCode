@@ -17,3 +17,9 @@
 
 - Done: Renamed package, targets (`SwiftCodeCore`, `SwiftCodeDaemon`, `swiftcode`, `SwiftCodeCoreTests`, `SwiftCodeApp`, `SwiftCodeAppTests`), bundle/service IDs (`dev.swiftcode.*`), config/checkpoint paths (`.swiftcode/`, `~/.swiftcode/`), primary types (`SwiftCodeConfiguration`, `SwiftCodeTool`, `SwiftCodeSkill`, `SwiftCodeCLI`, `SwiftCodeAppContainer`), regenerated `SwiftCodeApp.xcodeproj`, and updated docs/context.
 - Next: Verify `swift test`, release `swiftcode` binary, and `SwiftCodeApp` `ess-xcode-run` + `SwiftCodeAppTests`.
+
+## 2026-11-16 - Apple Foundation Models (Local Default + PCC Quota Notifications) & CLI-Only Open-Source Scope
+
+- Done: Added native `AppleFoundationModelVariant` (`.local` default ~4K unlimited vs `.privateCloudCompute` ~32K), `AppleFoundationModelProvider` (`FoundationModels` `SystemLanguageModel.default` + `PrivateCloudComputeLanguageModel`), `PCCQuotaState`/`PCCQuotaNotice` with remaining wait-day calculation and iCloud+ subscription guidance (`LimitIncreaseSuggestion`), CLI `swiftcode model [local|pcc] [--icloud]` + TUI `/model` + `PCCDesktopNotifier` macOS Notification Center alerts; removed `SwiftCodeApp/` GUI target cleanly per CLI-only open-source scope and aligned `AGENTS.md`, `README.md`, and `context/`.
+- Verified: `swift test` passed 33/33 tests across 9 suites; release `.build/release/swiftcode` built cleanly (28M) and `swiftcode doctor` + `swiftcode model` verified live `Local (4096 tok)` + `PCC` availability on hardware at 20.12 MB RSS.
+- Next: Stage and ship CLI-only updates to `origin main` when ready.
