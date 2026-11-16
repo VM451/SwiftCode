@@ -31,11 +31,13 @@ public actor ContextCompactor {
     public func compactIfNeeded(
         systemPrompt: String,
         messages: [ConversationMessage],
+        maxTokensOverride: Int? = nil,
         utilityProvider: (any LLMProvider)? = nil,
         utilityModel: String? = nil
     ) async -> CompactionOutcome {
         let before = estimateTokens(systemPrompt: systemPrompt, messages: messages)
-        let threshold = Int(Double(maxTokens) * thresholdRatio)
+        let effectiveMax = max(100, maxTokensOverride ?? maxTokens)
+        let threshold = Int(Double(effectiveMax) * thresholdRatio)
         guard before >= threshold, messages.count > keepRecentTurns else {
             return CompactionOutcome(compactedMessages: messages, beforeTokens: before, afterTokens: before, didCompact: false)
         }
